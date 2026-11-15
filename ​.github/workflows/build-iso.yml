@@ -1,0 +1,52 @@
+name: Build Yann Seven OS
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-iso:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install live-build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y live-build debootstrap squashfs-tools xorriso isolinux syslinux-common
+
+      - name: Configure Debian Live Build
+        run: |
+          mkdir -p build
+          cd build
+          lb config \
+            --distribution bookworm \
+            --architecture amd64 \
+            --binary-images iso-hybrid \
+            --debian-installer false \
+            --compression xz \
+            --archive-areas "main contrib non-free non-free-firmware" \
+            --bootappend-live "boot=live components locales=pt_BR.UTF-8 keyboard-layouts=br"
+
+      - name: Copy custom configurations
+        run: |
+          cp -r config/* build/config/
+          chmod +x build/config/hooks/live/*.hook.chroot
+
+      - name: Build ISO (Max 4GB target)
+        run: |
+          cd build
+          sudo lb build
+
+      - name: Check ISO size
+        run: |
+          ls -lh build/*.iso
+
+      - name: Upload ISO Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Yann-Seven-OS
+          path: build/*.iso
+          retention-days: 7
